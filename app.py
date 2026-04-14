@@ -13,8 +13,7 @@ st.set_page_config(page_title="AI Sales Dashboard", layout="wide")
 # HEADER
 # =====================
 st.title("📊 AI Sales Forecast Dashboard")
-st.markdown("Upload Walmart data and get instant AI insights + predictions")
-
+st.markdown("Upload your dataset to generate AI-powered insights and predictions instantly")
 # =====================
 # SIDEBAR
 # =====================
