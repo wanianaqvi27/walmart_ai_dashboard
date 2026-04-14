@@ -1,98 +1,109 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
 
-# =====================
-# PAGE CONFIG (PRO LOOK)
-# =====================
+# =========================
+# PAGE CONFIG (PRO UI)
+# =========================
 st.set_page_config(page_title="AI Sales Dashboard", layout="wide")
 
-# =====================
-# HEADER
-# =====================
-st.title("📊 AI Sales Forecast Dashboard")
-st.markdown("Upload your dataset to generate AI-powered insights and predictions instantly")
-# =====================
-# SIDEBAR
-# =====================
-st.sidebar.header("⚙️ Controls")
+st.title("📊 AI Sales Analytics Dashboard")
+st.markdown("Upload any sales dataset and get instant insights 🚀")
 
-file = st.sidebar.file_uploader("Upload Dataset", type=["csv"])
+# =========================
+# UPLOAD FILE
+# =========================
+file = st.file_uploader("Upload your CSV file", type=["csv"])
 
-# =====================
-# MAIN APP
-# =====================
 if file:
     df = pd.read_csv(file)
 
-    st.success("Data loaded successfully ✅")
+    st.success("Dataset loaded successfully ✅")
 
-    # FIX DATE
-   date_col = st.selectbox("Select Date Column", df.columns)
-sales_col = st.selectbox("Select Sales Column", df.columns)
+    st.subheader("📄 Data Preview")
+    st.dataframe(df.head())
 
-df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+    # =========================
+    # AUTO DETECT COLUMNS
+    # =========================
+    date_candidates = [col for col in df.columns if "date" in col.lower() or "time" in col.lower()]
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
 
-    # =====================
-    # KPI CARDS (PRO LOOK)
-    # =====================
-    total_sales = df["Weekly_Sales"].sum()
-    avg_sales = df["Weekly_Sales"].mean()
-    total_stores = df["Store"].nunique()
+    if len(date_candidates) == 0:
+        st.warning("⚠️ No date column detected. Trend graph may not work.")
+        date_col = None
+    else:
+        date_col = st.selectbox("Select Date Column", date_candidates)
+
+    if len(numeric_cols) == 0:
+        st.error("❌ No numeric columns found for sales analysis")
+        st.stop()
+
+    sales_col = st.selectbox("Select Sales Column", numeric_cols)
+
+    # =========================
+    # CLEAN DATA
+    # =========================
+    if date_col:
+        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+
+    df[sales_col] = pd.to_numeric(df[sales_col], errors="coerce")
+
+    df = df.dropna(subset=[sales_col])
+
+    # =========================
+    # KPI METRICS
+    # =========================
+    total_sales = df[sales_col].sum()
+    avg_sales = df[sales_col].mean()
+    rows = len(df)
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric("💰 Total Sales", f"{total_sales:,.0f}")
-    col2.metric("📊 Avg Sales", f"{avg_sales:,.0f}")
-    col3.metric("🏬 Stores", total_stores)
+    col2.metric("📊 Average Sales", f"{avg_sales:,.2f}")
+    col3.metric("📁 Rows", rows)
 
-    # =====================
-    # CHARTS SECTION
-    # =====================
+    # =========================
+    # SALES TREND
+    # =========================
     st.subheader("📈 Sales Trend")
 
-    fig, ax = plt.subplots()
-    df.groupby("Date")["Weekly_Sales"].sum().plot(ax=ax)
-    st.pyplot(fig)
+    if date_col:
+        try:
+            monthly_sales = df.groupby(pd.Grouper(key=date_col, freq="ME"))[sales_col].sum()
 
-    # =====================
-    # INSIGHTS SECTION
-    # =====================
-    st.subheader("🏆 Top Stores")
-    st.write(df.groupby("Store")["Weekly_Sales"].sum().sort_values(ascending=False).head(10))
+            fig, ax = plt.subplots()
+            monthly_sales.plot(ax=ax)
+            ax.set_title("Sales Over Time")
+            st.pyplot(fig)
 
-    st.subheader("🏖️ Holiday Impact")
-    st.write(df.groupby("Holiday_Flag")["Weekly_Sales"].mean())
+        except:
+            st.warning("⚠️ Could not generate trend graph (date issue)")
+    else:
+        st.info("Upload dataset with a date column for trend analysis")
 
-    # =====================
-    # ML MODEL
-    # =====================
-    st.subheader("🤖 AI Prediction Model")
+    # =========================
+    # TOP DATA INSIGHT
+    # =========================
+    st.subheader("🏆 Top 10 Highest Sales Records")
 
-    features = ["Store", "Holiday_Flag", "Year", "Month"]
+    st.dataframe(df.sort_values(by=sales_col, ascending=False).head(10))
 
-    X = df[features]
-    y = df["Weekly_Sales"]
+    # =========================
+    # SIMPLE INSIGHT SECTION
+    # =========================
+    st.subheader("📊 Quick Insights")
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    col1, col2 = st.columns(2)
 
-    model = RandomForestRegressor(n_estimators=100)
-    model.fit(X_train, y_train)
+    with col1:
+        st.write("Highest Sales Value:")
+        st.success(df[sales_col].max())
 
-    # =====================
-    # PREDICTION UI (PRO)
-    # =====================
-    st.subheader("🔮 Predict Sales")
+    with col2:
+        st.write("Lowest Sales Value:")
+        st.warning(df[sales_col].min())
 
-    col1, col2, col3, col4 = st.columns(4)
-
-    store = col1.number_input("Store", 1, 50, 1)
-    holiday = col2.selectbox("Holiday", [0, 1])
-    year = col3.number_input("Year", 2010, 2030, 2015)
-    month = col4.number_input("Month", 1, 12, 1)
-
-    if st.button("Predict Now 🚀"):
-        prediction = model.predict([[store, holiday, year, month]])
-        st.success(f"Predicted Weekly Sales: ${prediction[0]:,.2f}")
+else:
+    st.info("⬆️ Upload a CSV file to start analysis")
