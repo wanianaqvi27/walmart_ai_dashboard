@@ -30,9 +30,10 @@ if file:
     st.success("Data loaded successfully ✅")
 
     # FIX DATE
-    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
-    df["Year"] = df["Date"].dt.year
-    df["Month"] = df["Date"].dt.month
+   date_col = st.selectbox("Select Date Column", df.columns)
+sales_col = st.selectbox("Select Sales Column", df.columns)
+
+df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
 
     # =====================
     # KPI CARDS (PRO LOOK)
